@@ -1768,3 +1768,209 @@ print(recommendations)  # Returns relevant movies
 ✅ Used in **chatbots, e-commerce, recommendation engines**, etc.  
 
 This should give you a **strong** grasp of `AsyncPostgresStore`. Let me know if you need more examples! 🚀
+
+---
+
+
+This is a large topic covering the usage of `PostgresStore` for storing, retrieving, searching, and indexing data using PostgreSQL, along with optional vector search using `pgvector`. I'll break it down into detailed sections so you can understand it fully, even as a beginner.  
+
+---
+
+# 📌 **Understanding `PostgresStore` in Depth**
+`PostgresStore` is a PostgreSQL-backed storage system that allows you to store, retrieve, and search structured data, including support for **vector search** using `pgvector`.  
+
+It provides:  
+✅ **Basic CRUD operations** (Create, Read, Update, Delete).  
+✅ **Hierarchical namespacing** for organizing data.  
+✅ **Vector search support** for similarity-based queries.  
+
+### **🛠️ Where is `PostgresStore` Used in Real Life?**
+1. **🔎 Semantic Search:** Used in AI-powered search engines for retrieving documents similar to a query.  
+2. **🛍️ E-commerce Recommendations:** Finds similar products based on vector embeddings.  
+3. **📚 Knowledge Management Systems:** Stores documents with metadata and enables natural language search.  
+
+---
+
+# 🔹 **1. Setting Up and Using `PostgresStore`**  
+Let's go step by step through how we can connect and use `PostgresStore`.  
+
+### **📌 Example 1: Basic Connection and Usage**
+```python
+from langgraph.store.postgres import PostgresStore
+from psycopg import Connection
+
+# Define PostgreSQL connection string
+conn_string = "postgresql://user:pass@localhost:5432/dbname"
+
+# Using direct connection
+with Connection.connect(conn_string) as conn:
+    store = PostgresStore(conn)  # Initialize store with the connection
+    store.setup()  # Run necessary migrations (do this once)
+
+    # Store a user preference
+    store.put(("users", "123"), "prefs", {"theme": "dark"})
+
+    # Retrieve the stored preference
+    item = store.get(("users", "123"), "prefs")
+    print(item)  # Output: {'theme': 'dark'}
+```
+
+### **📝 Code Breakdown**
+- **`Connection.connect(conn_string)`** → Establishes a connection to PostgreSQL.  
+- **`PostgresStore(conn)`** → Initializes a store using the database connection.  
+- **`store.setup()`** → Runs migrations (sets up tables and indexes).  
+- **`store.put(("users", "123"), "prefs", {"theme": "dark"})`** → Stores user preference data.  
+- **`store.get(("users", "123"), "prefs")`** → Retrieves stored data.  
+
+### **✅ Alternative Approach: Using `from_conn_string`**
+Instead of manually connecting, you can use a helper function:
+
+```python
+from langgraph.store.postgres import PostgresStore
+
+conn_string = "postgresql://user:pass@localhost:5432/dbname"
+
+with PostgresStore.from_conn_string(conn_string) as store:
+    store.setup()
+    
+    # Store and retrieve data
+    store.put(("users", "123"), "prefs", {"theme": "dark"})
+    item = store.get(("users", "123"), "prefs")
+    print(item)
+```
+
+✔ **This method is simpler** because it handles connection management automatically.
+
+---
+
+# 🔹 **2. Implementing Vector Search in `PostgresStore`**
+### **🔍 What is Vector Search?**
+Vector search allows **semantic similarity** searching. Instead of exact matches, it finds **similar** results based on vector embeddings.
+
+### **📌 Example 2: Using LangChain Embeddings**
+```python
+from langchain.embeddings import init_embeddings
+from langgraph.store.postgres import PostgresStore
+
+# Define connection string
+conn_string = "postgresql://user:pass@localhost:5432/dbname"
+
+# Initialize the store with vector search enabled
+with PostgresStore.from_conn_string(
+    conn_string,
+    index={
+        "dims": 1536,  # Embedding dimension size
+        "embed": init_embeddings("openai:text-embedding-3-small"),  # Embedding function
+        "fields": ["text"]  # Which fields to embed
+    }
+) as store:
+    store.setup()  # Setup required tables and indexes
+
+    # Store documents with vector embeddings
+    store.put(("docs",), "doc1", {"text": "Python tutorial"})
+    store.put(("docs",), "doc2", {"text": "TypeScript guide"})
+
+    # Search for similar documents
+    results = store.search(("docs",), "programming guides", limit=2)
+    print(results)
+```
+
+### **📝 Code Breakdown**
+- **`init_embeddings("openai:text-embedding-3-small")`** → Uses OpenAI embeddings for vectorization.  
+- **`index={"dims": 1536, "embed": ..., "fields": ["text"]}`** → Defines vector index settings.  
+- **`store.put(("docs",), "doc1", {"text": "Python tutorial"})`** → Stores document with vector representation.  
+- **`store.search(("docs",), "programming guides", limit=2)`** → Searches for similar documents.  
+
+---
+
+# 🔹 **3. Searching with Filters and Queries**
+### **📌 Example 3: Filtering Search Results**
+```python
+# Search for published articles
+results = store.search(
+    ("docs",),
+    filter={"type": "article", "status": "published"}
+)
+print(results)
+```
+🔹 This retrieves only documents where `"type"="article"` and `"status"="published"`.
+
+### **📌 Example 4: Natural Language Search**
+```python
+results = store.search(
+    ("docs",),
+    query="machine learning applications in healthcare",
+    filter={"type": "research_paper"},
+    limit=5
+)
+print(results)
+```
+✅ This finds research papers relevant to **machine learning in healthcare**.
+
+---
+
+# 🔹 **4. CRUD Operations in `PostgresStore`**
+### **📌 Storing Data (`put` method)**
+```python
+store.put(("docs",), "report", {"memory": "Will likes AI"})
+```
+✔ Stores a document under `"docs"` namespace.
+
+### **📌 Retrieving Data (`get` method)**
+```python
+data = store.get(("docs",), "report")
+print(data)  # Output: {'memory': 'Will likes AI'}
+```
+✔ Fetches the stored document.
+
+### **📌 Deleting Data (`delete` method)**
+```python
+store.delete(("docs",), "report")
+```
+✔ Removes the document from storage.
+
+---
+
+# 🔹 **5. Listing Namespaces**
+Namespaces help in organizing data like folders.
+
+```python
+namespaces = store.list_namespaces(prefix=("a", "b"), max_depth=3)
+print(namespaces)
+```
+✔ Returns a structured list of namespaces under `("a", "b")`.
+
+---
+
+# 🔹 **6. Asynchronous Operations**
+If working with **async frameworks** (e.g., FastAPI), use `asearch` and `aget`.
+
+```python
+results = await store.asearch(("docs",), query="AI applications")
+```
+✔ Asynchronous version of `search`.
+
+---
+
+# 🎯 **Key Takeaways**
+✅ `PostgresStore` allows hierarchical storage with indexing and vector search.  
+✅ Supports **semantic search** via `pgvector` and LangChain embeddings.  
+✅ Offers **CRUD operations** with namespaces for better data management.  
+✅ Supports **both synchronous and asynchronous** operations.  
+
+---
+
+# 📌 **Conclusion**
+You now understand how to:  
+✔ Connect and initialize `PostgresStore`.  
+✔ Store and retrieve structured data.  
+✔ Implement vector search for semantic queries.  
+✔ Use namespaces to organize data efficiently.  
+
+🚀 **Next Steps:**  
+Try implementing it in a **real project**, such as:  
+🔹 **AI-powered document search engine.**  
+🔹 **Personalized content recommendations.**  
+🔹 **Smart chatbots that retrieve information semantically.**  
+
+Let me know if you need further explanations! 🚀
